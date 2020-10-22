@@ -1,0 +1,13 @@
+function msg = encoder(g, b)
+% 
+%     test=1:10
+%     reshape(test, 5, 2)'
+% 
+
+    b = [b ; zeros()]
+    paquets = reshape(b, 6, )
+    nb_repet_g = ceil(length(b)/size(g, 2));
+    g_fat = repmat(g, 1, nb_repet_g);
+    msg = g_fat*b
+
+end
