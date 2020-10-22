@@ -23,9 +23,9 @@ Lc_matrix = reshape(Lc, nb_noeudsvar, length(Lc)/nb_noeudsvar)';
 % On a des msg de 3, codés avec redondance en mot de code de 6
 
 % premier mot de code
-premier_mdc = Lc(:, 1);
 
-find(H:, premier_mdc(1));
+
+find(H:, 
 
 for i=1:length(x)
     reshape()

@@ -77,8 +77,7 @@ for i_snr = 1:length(EbN0dB)
         tx_tic = tic;                 % Mesure du debit d'encodage
         b      = randi([0,1],K,1);    % Generation du message aleatoire
 
-%         code = encoder(g, b) % encodage LDPC
-        code = b;
+        code = encoder(g, b) % encodage LDPC
 
         x      = 1 - 2*code; % Modulation BPSK
         T_tx   = T_tx+toc(tx_tic);    % Mesure du debit d'encodage
@@ -91,7 +90,7 @@ for i_snr = 1:length(EbN0dB)
         rx_tic = tic;                  % Mesure du debit de decodage
         Lc      = 2*y/sigma2;   % Demodulation (retourne des LLRs)
 
-%         decoder(Lc, H);
+        decoder(Lc, H);
 
         rec_b = double(Lc(1:K) < 0); % Decision
         T_rx    = T_rx + toc(rx_tic);  % Mesure du debit de decodage
