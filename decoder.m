@@ -53,14 +53,8 @@ for i_motdecode = 1:size(Lch_matrix, 1)
 
                     % On ne retient pas les liens sur lequel on est
                     connecteds2c(connecteds2c == ivx) = [];
-
-                    produit_de_tanh = 1;
-
-                    for connected2c = connecteds2c
-                        produit_de_tanh = produit_de_tanh * tanh(V2C(icy, connected2c)/2);
-                    end
                     
-                    C2V(icy, ivx) = 2*atanh(produit_de_tanh);
+                    C2V(icy, ivx) = 2*atanh(prod(tanh(connecteds2c/2)));
                 end
             end
         end
