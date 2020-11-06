@@ -1,43 +1,94 @@
-function decoder( Lc, H )
+function y = decoder( Lch, H )
 
 
-%% Initialisation
 
-matrix_C2V = sparse(size(H)); % matrice de 0
-matrix_V2C = matrix_C2V;
 
-[y, x] = find(H);
+%% premiere passe avec tout C2V a 0 donc ca laisse passer que les LLRs
+nb_noeudsvar = size(H, 2);
+nb_noeudsparite = size(H, 1);
+Lch_matrix = reshape(Lch, nb_noeudsvar, length(Lch)/nb_noeudsvar)';
 
-%% première passe avec tout C2V à 0 donc ca laisse passer que les LLRs
-nb_noeudsparite = size(H, 2);
-Lc_matrix = reshape(Lc, nb_noeudsparite, length(Lc)/nb_noeudsparite)';
-
-%% Je veux mettre tous les noeuds de parités (carrés) dans les noeuds de var (ronds)
-% sachant qu'on comprend tous les n_parités = 0, + sauf ceux qu'on rajoute
+%% Je veux mettre tous les noeuds de parites (carres) dans les noeuds de var (ronds)
+% sachant qu'on comprend tous les n_parites = 0, + sauf ceux qu'on rajoute
 % qui sont les observations du canal
 
 % Dans les 6 de Lc_matrix
 % je dois refourguer Lc(1) dans V2C(1, 1) V2C(2, 1) V2C(3, 1) etc.,
-% exceptés ceux qui sont à 0 dans H
+% exceptes ceux qui sont a 0 dans H
 
-% On a des msg de 3, codés avec redondance en mot de code de 6
+% On a des msg de 3, codes avec redondance en mot de code de 6
 
 % premier mot de code
-premier_mdc = Lc_matrix(1, :);
 
 % On veut dupliquer le premier bit du mot de code dans tous les noeuds de
-% parité correspondant
+% parite correspondant
 
-% Après on fait des +(XOR) pour avoir la valeur des noeuds de variables
-% find(H:, premier_mdc(1));
+% Apres on fait des +(XOR) pour avoir la valeur des noeuds de variables
 
-%% Init = V2C=LLR||0
-% Itération = 1
 
-LLR_repetes = repmat(premier_mdc, 3, 1);
-matrix_V2C = H.*LLR_repetes;
+% voir slide 43
+y = zeros(nb_noeudsparite*length(Lch)/nb_noeudsvar,1);
+for i_motdecode = 1:size(Lch_matrix, 1)
+    
+    mdc = Lch_matrix(i_motdecode, :);
 
-matrix_C2V = 
+    LLR_repetes = repmat(mdc, 3, 1);
 
-for i = 1:
-2*atanh*(tanh(LC1/2)*tanh(LC2/2)*tanh(LC3/2))
+    %% Initialisation V2C/C2V
+    
+    C2V = H.*LLR_repetes; % Observation comme des parites dans les noeuds de var
+    V2C = C2V; % Noeuds de var dans les parites
+    % [y, x] = find(H);
+    nb_iterations = 4; % pour chaque mot de code
+    
+    for n = 1:nb_iterations
+        %% Boucle remplissage C2V
+        for icy = 1:nb_noeudsparite
+            for ivx = 1:nb_noeudsvar
+                if(H(icy, ivx) == 1)
+                    % Il y a un lien entre 2 noeuds ici
+
+                    % On trouve ou sont les liens relies a ce noeud
+                    connecteds2c = find(H(icy, :)); % on repere les liens mon noeud de parite --> noeuds de var
+
+                    % On ne retient pas les liens sur lequel on est
+                    connecteds2c(connecteds2c == ivx) = [];
+
+                    produit_de_tanh = 1;
+
+                    for connected2c = connecteds2c
+                        produit_de_tanh = produit_de_tanh * tanh(V2C(icy, connected2c)/2);
+                    end
+                    
+                    C2V(icy, ivx) = 2*atanh(produit_de_tanh);
+                end
+            end
+        end
+        %% Boucle remplissage V2C
+        for icy = 1:nb_noeudsparite
+            for ivx = 1:nb_noeudsvar
+                if(H(icy, ivx) == 1)
+                    % Il y a un lien entre 2 noeuds ici
+                    connecteds2v = find(H(:, ivx)); % on repere les liens mon noeud de var --> noeuds de parites
+
+                    % On ne retient pas les liens sur lequel on est
+                    connecteds2v(connecteds2v == icy) = [];
+
+                    % LLR du bit du canal qui est arrive par ce noeud de var
+                    somme = mdc(ivx);
+                    for connected2v = connecteds2v
+                        somme = somme + C2V(connected2v, ivx);
+                    end
+                end
+            end
+        end
+    end
+    LLRs = sum(V2C, 1); % Je somme sur les colonnes
+    msg = LLRs + mdc;
+    msg = msg(end-nb_noeudsparite+1:end)'; % car code syst�matique
+    
+    y((1:nb_noeudsparite)+nb_noeudsparite*(i_motdecode-1)) = msg(:);
+    
+end
+
+

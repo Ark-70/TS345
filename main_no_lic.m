@@ -16,7 +16,7 @@ N = K/R; % Nombre de bits codes par trame (codee)
 M = 2; % Modulation BPSK <=> 2 symboles
 phi0 = 0; % Offset de phase our la BPSK
 
-EbN0dB_min  = -2; % Minimum de EbN0
+EbN0dB_min  = 10; % Minimum de EbN0
 EbN0dB_max  = 10; % Maximum de EbN0
 EbN0dB_step = 1;% Pas de EbN0
 
@@ -51,6 +51,8 @@ msg_header =  '|  Eb/N0 dB  |    Bit nbr    |  Bit err   |   TEB    |    Debit T
 fprintf(msg_header);
 fprintf(      '|------------|---------------|------------|----------|----------------|-----------------|--------------|\n')
 
+[H] = alist2sparse('alist/DEBUG_6_3.alist');
+g = ldpc_h2g(H); % on a 2 H, un h systématique et un H de base bien design é
 
 %% Simulation
 for i_snr = 1:length(EbN0dB)
@@ -66,33 +68,33 @@ for i_snr = 1:length(EbN0dB)
     while (err_stat(2) < nbr_erreur && err_stat(3) < nbr_bit_max)
         n_frame = n_frame + 1;
 
-        %% Mise en commun Emetteur/Récepteur
-
-        [H] = alist2sparse('alist/DEBUG_6_3.alist');
-        [h, g] = ldpc_h2g(H) % on a 2 H, un h systématique et un H de base bien design é
+        %% Mise en commun Emetteur/Recepteur
         % On utilise la G systématique pour générer et la H de base pour décoder
 
 
         %% Emetteur
         tx_tic = tic;                 % Mesure du debit d'encodage
         b      = randi([0,1],K,1);    % Generation du message aleatoire
+%         b = zeros(K,1);
 
-        code = encoder(g, b) % encodage LDPC
+        code = encoder(g, b); % encodage LDPC
 
         x      = 1 - 2*code; % Modulation BPSK
         T_tx   = T_tx+toc(tx_tic);    % Mesure du debit d'encodage
 
         %% Canal
         n     = sqrt(sigma2) * randn(size(x));
+        
         y     = x + n; % Ajout d'un bruit gaussien
 
         %% Recepteur
         rx_tic = tic;                  % Mesure du debit de decodage
-        Lc      = 2*y/sigma2;   % Demodulation (retourne des LLRs)
+        Lch      = 2*y/sigma2;         % Demodulation (retourne des LLRs)
 
-        decoder(Lc, H);
+        y = decoder(Lch, H);
 
-        rec_b = double(Lc(1:K) < 0); % Decision
+%         rec_b = double(y) < 0);   % Decision
+        rec_b = double(y(1:K) < 0);   % Decision
         T_rx    = T_rx + toc(rx_tic);  % Mesure du debit de decodage
 
         err_stat(2) = err_stat(2) + sum(b(:) ~= rec_b(:));
@@ -100,7 +102,7 @@ for i_snr = 1:length(EbN0dB)
         err_stat(1) = err_stat(2)/err_stat(3);
 
         %% Affichage du resultat
-        if mod(n_frame,100) == 1
+        if mod(n_frame,1) == 0
             msg = sprintf(msg_format,...
                 EbN0dB(i_snr),         ... % EbN0 en dB
                 err_stat(3),           ... % Nombre de bits envoyes
