@@ -1,5 +1,10 @@
 clear
 clc
+%% Questions du TP
+% H est une matrice irrégulière
+
+
+
 
 %% Parametres
 % -------------------------------------------------------------------------
@@ -14,17 +19,17 @@ K = pqt_par_trame*bit_par_pqt; % Nombre de bits de message par trame
 N = K/R; % Nombre de bits codes par trame (codee)
 
 M = 2; % Modulation BPSK <=> 2 symboles
-phi0 = 0; % Offset de phase our la BPSK
+phi0 = 0; % Offset de phase pour la BPSK
 
-EbN0dB_min  = 10; % Minimum de EbN0
+EbN0dB_min  = -2; % Minimum de EbN0
 EbN0dB_max  = 10; % Maximum de EbN0
 EbN0dB_step = 1;% Pas de EbN0
 
-nbr_erreur  = 100;  % Nombre d'erreurs e observer avant de calculer un BER
-nbr_bit_max = 100e6;% Nombre de bits max e simuler
+nbr_erreur  = 100;  % Nombre d'erreurs a observer avant de calculer un BER
+nbr_bit_max = 100e6;% Nombre de bits max a simuler
 ber_min     = 1e-6; % BER min
 
-EbN0dB = EbN0dB_min:EbN0dB_step:EbN0dB_max;     % Points de EbN0 en dB e simuler
+EbN0dB = EbN0dB_min:EbN0dB_step:EbN0dB_max;     % Points de EbN0 en dB a simuler
 EbN0   = 10.^(EbN0dB/10);% Points de EbN0 a simuler
 EsN0   = R*log2(M)*EbN0; % Points de EsN0
 EsN0dB = 10*log10(EsN0); % Points de EsN0 en dB a simuler
@@ -33,7 +38,7 @@ EsN0dB = 10*log10(EsN0); % Points de EsN0 en dB a simuler
 %% Initialisation des vecteurs de resultats
 ber = zeros(1,length(EbN0dB));
 Pe = 0.5*erfc(sqrt(EbN0));
-
+per = zeros(1,length(EbN0dB));
 %% Preparation de l'affichage
 figure(1)
 h_ber = semilogy(EbN0dB,ber,'XDataSource','EbN0dB', 'YDataSource','ber');
@@ -60,7 +65,9 @@ for i_snr = 1:length(EbN0dB)
     sigma2 = 1/(2*EsN0(i_snr));
 
     err_stat    = [0 0 0]; % vecteur resultat de stat_erreur
-
+    nb_faux_paquets = 0;
+    taux_err_paquets = 0;
+    
     n_frame = 0;
     T_rx = 0;
     T_tx = 0;
@@ -97,12 +104,19 @@ for i_snr = 1:length(EbN0dB)
         rec_b = double(y(1:K) < 0);   % Decision
         T_rx    = T_rx + toc(rx_tic);  % Mesure du debit de decodage
 
+        
         err_stat(2) = err_stat(2) + sum(b(:) ~= rec_b(:));
+        
         err_stat(3) = err_stat(3) + K;
         err_stat(1) = err_stat(2)/err_stat(3);
+        
+        % Calcul du TEP
+%         nb_faux_paquets = any(y~=b, 2);
+        nb_faux_paquets = nb_faux_paquets + any(rec_b~=b);
+        taux_err_paquets = nb_faux_paquets /n_frame;
 
         %% Affichage du resultat
-        if mod(n_frame,1) == 0
+        if mod(n_frame,100) == 0
             msg = sprintf(msg_format,...
                 EbN0dB(i_snr),         ... % EbN0 en dB
                 err_stat(3),           ... % Nombre de bits envoyes
@@ -131,6 +145,7 @@ for i_snr = 1:length(EbN0dB)
     reverseStr = repmat(sprintf('\b'), 1, msg_sz);
 
     ber(i_snr) = err_stat(1);
+    per(i_snr) = taux_err_paquets;
     refreshdata(h_ber);
     drawnow limitrate
 
