@@ -81,8 +81,8 @@ for i_snr = 1:length(EbN0dB)
 
         %% Emetteur
         tx_tic = tic;                 % Mesure du debit d'encodage
-        b      = randi([0,1],K,1);    % Generation du message aleatoire
-%         b = zeros(K,1);
+%         b      = randi([0,1],K,1);    % Generation du message aleatoire
+        b = ones(K,1);
 
         code = encoder(g, b); % encodage LDPC
 
@@ -91,6 +91,7 @@ for i_snr = 1:length(EbN0dB)
 
         %% Canal
         n     = sqrt(sigma2) * randn(size(x));
+        n = 0;
         
         y     = x + n; % Ajout d'un bruit gaussien
 

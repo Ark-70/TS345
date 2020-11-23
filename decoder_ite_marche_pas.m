@@ -38,12 +38,9 @@ for i_motdecode = 1:size(Lch_matrix, 1)
     LLR_repetes = repmat(mdc, 3, 1);
 
     %% Initialisation V2C/C2V
-
-    C2V = zeros(size(H)); % Observation comme des parites dans les noeuds de var
-    V2C = H.*LLR_repetes; % Noeuds de var dans les parites
+    C2V = H.*LLR_repetes; % Observation comme des parites dans les noeuds de var
+    V2C = C2V; % Noeuds de var dans les parites
     % [y, x] = find(H);
-
-
     for n = 1:nb_iterations
         %% Boucle remplissage C2V
         n

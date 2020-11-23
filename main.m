@@ -76,6 +76,9 @@ msg_header =  '|  Eb/N0 dB  |    Bit nbr    |  Bit err   |   TEB    |    Debit T
 fprintf(msg_header);
 fprintf(      '|------------|---------------|------------|----------|----------------|-----------------|--------------|\n')
 
+[H] = alist2sparse('alist/DEBUG_6_3.alist');
+g = ldpc_h2g(H); % on a 2 H, un h systématique et un H de base bien design é
+
 
 %% Simulation
 for i_snr = 1:length(EbN0dB)
@@ -97,20 +100,23 @@ for i_snr = 1:length(EbN0dB)
         %% Emetteur
         tx_tic = tic;                 % Mesure du d�bit d'encodage
         b    = randi([0,1],K,1);    % G�n�ration du message al�atoire
-        x      = step(mod_psk,  b); % Modulation BPSK
+        b = ones(K,1);
+        code = encoder(g, b); % encodage LDPC
+        x      = step(mod_psk,  code); % Modulation BPSK
         T_tx   = T_tx+toc(tx_tic);    % Mesure du d�bit d'encodage
         
         %% Canal
-        y     = step(awgn_channel,x); % Ajout d'un bruit gaussien
+%         y     = step(awgn_channel,x); % Ajout d'un bruit gaussien
+        y = x;
         
         %% Recepteur
         rx_tic = tic;                  % Mesure du d�bit de d�codage
-        Lc      = step(demod_psk,y);   % D�modulation (retourne des LLRs)
+        Lch      = step(demod_psk,y);   % D�modulation (retourne des LLRs)
         
 %         H = alist2sparse('alist/DEBUG_6_3.alist');
-        propagate_decod(H, Lc);
+        y = decoder(Lch, H);
         
-        rec_b = double(Lc(1:K) < 0); % D�cision
+        rec_b = double(Lch(1:K) < 0); % D�cision
         T_rx    = T_rx + toc(rx_tic);  % Mesure du d�bit de d�codage
         
         err_stat   = step(stat_erreur, b, rec_b); % Comptage des erreurs binaires
