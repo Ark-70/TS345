@@ -1,4 +1,4 @@
-clear
+clear all
 clc
 
 %% Parametres
@@ -77,8 +77,8 @@ fprintf(msg_header);
 fprintf(      '|------------|---------------|------------|----------|----------------|-----------------|--------------|\n')
 
 [H] = alist2sparse('alist/DEBUG_6_3.alist');
-g = ldpc_h2g(H); % on a 2 H, un h systématique et un H de base bien design é
-
+% [~, g] = ldpc_h2g(H); % on a 2 H, un h systématique et un H de base bien design é
+g = [1 1 1 1 0 0; 0 1 0 0 1 0; 1 0 1 0 0 1];
 
 %% Simulation
 for i_snr = 1:length(EbN0dB)
@@ -114,7 +114,7 @@ for i_snr = 1:length(EbN0dB)
         Lch      = step(demod_psk,y);   % D�modulation (retourne des LLRs)
         
 %         H = alist2sparse('alist/DEBUG_6_3.alist');
-        y = decoder(Lch, H);
+        y = decoder_ite_marche_pas(Lch, H);
         
         rec_b = double(Lch(1:K) < 0); % D�cision
         T_rx    = T_rx + toc(rx_tic);  % Mesure du d�bit de d�codage

@@ -46,10 +46,10 @@ for i_motdecode = 1:size(Lch_matrix, 1)
 
     for n = 1:nb_iterations
         %% Boucle remplissage C2V
-        n
-        full(C2V)
-        full(V2C)
-        nb_iterations
+        n;
+        full(C2V);
+        full(V2C);
+        nb_iterations;
 %         for icy = cy % Ca marche pas du tout cette merde, monsieur
         for i_c = 1:length(all_icy)
             icy = all_icy(i_c); % i_c c'est un index pour un tableau d'index #MindBlown #JeanReviensPas

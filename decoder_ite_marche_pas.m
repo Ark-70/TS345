@@ -1,4 +1,4 @@
-function y = decoder( Lch, H )
+function y = decoder_ite_marche_pas( Lch, H )
 
 
 
