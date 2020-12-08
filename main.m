@@ -1,15 +1,32 @@
 clear all
 clc
 
+% FAIRE make DANS LA CONSOLE POUR CREER LA FONCTION LDPC_H2G
+
+%% Constantes
+
+RANDOM_ON = 1;
+NOISE_ON = 1;
+
+
+
+
 %% Parametres
 % -------------------------------------------------------------------------
 addpath('src')
 simulation_name = 'non_codee';
+H = alist2sparse('alist/DEBUG_6_3.alist'); % on lit H dans un json-like version matlab
+[~, g] = ldpc_h2g(H); % donne h et g systématiques (nécessite le compilateur C de matlab add-on MinGW)
+[h, w] = size(H);
 
-R = 1; % Rendement de la communication
+R = 1-(rank(full(H))/w); % rendement de la communication
 
+% Pour ce TP, on prend 1_msg = 1_paquet
 pqt_par_trame = 1; % Nombre de paquets par trame
-bit_par_pqt   = 330;% Nombre de bits par paquet
+
+bit_par_msg = h;
+bit_par_pqt = bit_par_msg;% Nombre de bits par paquet
+
 K = pqt_par_trame*bit_par_pqt; % Nombre de bits de message par trame
 N = K/R; % Nombre de bits codï¿½s par trame (codï¿½e)
 
@@ -22,6 +39,7 @@ EbN0dB_step = 1;% Pas de EbN0
 
 nbr_erreur  = 100;  % Nombre d'erreurs ï¿½ observer avant de calculer un BER
 nbr_bit_max = 100e6;% Nombre de bits max ï¿½ simuler
+nbr_bit_min = 10000;
 ber_min     = 1e-6; % BER min
 
 EbN0dB = EbN0dB_min:EbN0dB_step:EbN0dB_max;     % Points de EbN0 en dB ï¿½ simuler
@@ -94,29 +112,39 @@ for i_snr = 1:length(EbN0dB)
     T_rx = 0;
     T_tx = 0;
     general_tic = tic;
-    while (err_stat(2) < nbr_erreur && err_stat(3) < nbr_bit_max)
+    while (( err_stat(3) < nbr_bit_min || err_stat(2) < nbr_erreur) && err_stat(3) < nbr_bit_max)
         n_frame = n_frame + 1;
         
         %% Emetteur
         tx_tic = tic;                 % Mesure du dï¿½bit d'encodage
-        b    = randi([0,1],K,1);    % Gï¿½nï¿½ration du message alï¿½atoire
-        b = ones(K,1);
+        
+        if(RANDOM_ON)
+            b    = randi([0,1],K,1);    % Gï¿½nï¿½ration du message alï¿½atoire
+        else       
+            b    = ones(K,1);    % Gï¿½nï¿½ration du message alï¿½atoire
+        end
+            
         code = encoder(g, b); % encodage LDPC
+        
         x      = step(mod_psk,  code); % Modulation BPSK
         T_tx   = T_tx+toc(tx_tic);    % Mesure du dï¿½bit d'encodage
         
         %% Canal
-%         y     = step(awgn_channel,x); % Ajout d'un bruit gaussien
-        y = x;
+        
+        if(NOISE_ON)
+            y     = step(awgn_channel,x); % Ajout d'un bruit gaussien
+        else
+            y = x;
+        end
         
         %% Recepteur
         rx_tic = tic;                  % Mesure du dï¿½bit de dï¿½codage
         Lch      = step(demod_psk,y);   % Dï¿½modulation (retourne des LLRs)
         
 %         H = alist2sparse('alist/DEBUG_6_3.alist');
-        y = decoder_ite_marche_pas(Lch, H);
+        y = decoder(Lc, H);
         
-        rec_b = double(Lch(1:K) < 0); % Dï¿½cision
+        rec_b = double(y(1:K) < 0); % Dï¿½cision
         T_rx    = T_rx + toc(rx_tic);  % Mesure du dï¿½bit de dï¿½codage
         
         err_stat   = step(stat_erreur, b, rec_b); % Comptage des erreurs binaires
