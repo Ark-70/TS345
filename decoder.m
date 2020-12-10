@@ -1,4 +1,4 @@
-function y = decoder( Lch, H )
+function y = decoder( Lch, H, nb_iterations)
 
 % Taille de la matrice H
 nb_noeudsvar = size(H, 2);
@@ -13,13 +13,12 @@ y = zeros(nb_noeudsparite*length(Lch)/nb_noeudsvar,1);
 % ivx = l'index x (variable) de H
 [all_icy, all_ivx] = find(H); % On prend tous les indices des 1 de la matrice H
 
-nb_iterations = 10; % pour chaque mot de code
 
 for i_motdecode = 1:size(Lch_matrix, 1)
     
     mdc = Lch_matrix(i_motdecode, :); % mot de code
 
-    LLR_repetes = repmat(mdc, 3, 1); % on repete les LLRs pour pouvoir les mettre comme H (voir ligne V2C)
+    LLR_repetes = repmat(mdc, nb_noeudsparite, 1); % on repete les LLRs pour pouvoir les mettre comme H (voir ligne V2C)
 
     %% Itération n°0 avec tout C2V a 0 donc ca laisse passer que les LLRs
     
@@ -64,8 +63,8 @@ for i_motdecode = 1:size(Lch_matrix, 1)
 
             % LLR du bit du canal qui est arrive par ce noeud de var
             somme = mdc(ivx);
-            for connected2v = connecteds2v
-                somme = somme + C2V(connected2v, ivx);
+            for i_sum =1:length(connecteds2v)
+                somme = somme + C2V(connecteds2v(i_sum), ivx);
             end
             V2C(icy, ivx) = somme;
         end

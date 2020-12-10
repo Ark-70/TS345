@@ -8,23 +8,25 @@ clc
 RANDOM_ON = 1;
 NOISE_ON = 1;
 CHOIX_DU_CODE = 1; % entre 1 et 3
+nb_iterations = 3;
 
 %% Constantes  GRAPH
 
-EbN0dB_min  = -2; % Minimum de EbN0
+EbN0dB_min  = 0; % Minimum de EbN0
 EbN0dB_max  = 10; % Maximum de EbN0
 EbN0dB_step = 1;% Pas de EbN0
 
-nbr_erreur  = 100;  % Nombre d'erreurs a observer avant de calculer un BER
-nbr_bit_max = 100e6;% Nombre de bits max a simuler
-nbr_bit_min = 10000;
+nbr_err_min  = 50; % Nombre d'erreurs a observer avant de calculer un BER
+nbr_err_min_mauvais_snr = 200; % Nombre d'erreurs a observer sur un mauvais snr (défini en dessous)
+seuil_nbr_bits_requis = 6e4; % Si on ne dépasse pas ce nombre de bits, on doit au moins avoir 200 erreurs
+nbr_bit_max = 1e7; % Nombre de bits max a simuler
 ber_min     = 1e-6; % BER min
 
 %% Parametres calculÃ©s ou figÃ©s par le TP
 % -------------------------------------------------------------------------
 addpath('src');
-simulation_name = 'non_codee';
 codes_path = ["DEBUG_6_3", "CCSDS_64_128", "MACKAY_504_1008"];
+save_name = strcat(codes_path(CHOIX_DU_CODE),"_nb_ite_",int2str(nb_iterations));
 construct_full_path = strcat('alist/', codes_path(CHOIX_DU_CODE), '.alist')
 H = alist2sparse(construct_full_path); % on lit H dans un json-like version matlab
 [~, g] = ldpc_h2g(H); % donne h et g systematiques (necessite le compilateur C de matlab add-on MinGW)
@@ -76,6 +78,7 @@ stat_erreur = comm.ErrorRate(); % Calcul du nombre d'erreur et du BER
 
 %% Initialisation des vecteurs de resultats
 ber = zeros(1,length(EbN0dB));
+err_paquet = zeros(1,length(EbN0dB));
 Pe = qfunc(sqrt(2*EbN0));
 
 %% Preparation de l'affichage
@@ -103,6 +106,8 @@ for i_snr = 1:length(EbN0dB)
 
     stat_erreur.reset; % reset du compteur d'erreur
     err_stat    = [0 0 0]; % vecteur rï¿½sultat de stat_erreur
+    nb_err_paquets = 0;
+    taux_err_paquets = 0;
 
     demod_psk.Variance = awgn_channel.Variance;
 
@@ -110,7 +115,9 @@ for i_snr = 1:length(EbN0dB)
     T_rx = 0;
     T_tx = 0;
     general_tic = tic;
-    while (( err_stat(3) < nbr_bit_min || err_stat(2) < nbr_erreur) && err_stat(3) < nbr_bit_max)
+    
+    
+    while ((err_stat(3)<seuil_nbr_bits_requis || err_stat(2)<nbr_err_min) && err_stat(2) < nbr_err_min_mauvais_snr && err_stat(3) < nbr_bit_max)
         n_frame = n_frame + 1;
 
         %% Emetteur
@@ -140,12 +147,15 @@ for i_snr = 1:length(EbN0dB)
         Lch      = step(demod_psk,y);   % Dï¿½modulation (retourne des LLRs)
 
 %         H = alist2sparse('alist/DEBUG_6_3.alist');
-        y = decoder(Lch, H);
+        y = decoder(Lch, H, nb_iterations);
 
         rec_b = double(y(1:K) < 0); % Dï¿½cision
         T_rx    = T_rx + toc(rx_tic);  % Mesure du dï¿½bit de dï¿½codage
 
-        err_stat   = step(stat_erreur, b, rec_b); % Comptage des erreurs binaires
+        err_stat   = step(stat_erreur, b, rec_b); % Comptage des erreurs binaires et des taux
+
+        nb_err_paquets = nb_err_paquets + any(rec_b~=b); % Comptage des erreurs paquets//motdecode
+        taux_err_paquets = nb_err_paquets /n_frame;
 
         %% Affichage du rï¿½sultat
         if mod(n_frame,100) == 1
@@ -156,7 +166,7 @@ for i_snr = 1:length(EbN0dB)
                 err_stat(1),           ... % BER
                 err_stat(3)/8/T_tx/1e3,... % Dï¿½bit d'encodage
                 err_stat(3)/8/T_rx/1e3,... % Dï¿½bit de dï¿½codage
-                toc(general_tic)*(nbr_erreur - min(err_stat(2),nbr_erreur))/(min(err_stat(2),nbr_erreur))); % Temps restant
+                toc(general_tic)*(nbr_err_min - min(err_stat(2),nbr_err_min))/(min(err_stat(2),nbr_err_min))); % Temps restant
             fprintf(reverseStr);
             msg_sz =  fprintf(msg);
             reverseStr = repmat(sprintf('\b'), 1, msg_sz);
@@ -177,6 +187,7 @@ for i_snr = 1:length(EbN0dB)
     reverseStr = repmat(sprintf('\b'), 1, msg_sz);
 
     ber(i_snr) = err_stat(1);
+    per(i_snr) = nb_err_paquets/(err_stat(3)/h);
     refreshdata(h_ber);
     drawnow limitrate
 
@@ -190,11 +201,13 @@ fprintf('|------------|---------------|------------|----------|----------------|
 %%
 figure(1)
 semilogy(EbN0dB,ber);
-hold all
+hold all;
+semilogy(EbN0dB,per);
 xlim([0 10])
 ylim([1e-6 1])
 grid on
 xlabel('$\frac{E_b}{N_0}$ en dB','Interpreter', 'latex', 'FontSize',14)
 ylabel('TEB','Interpreter', 'latex', 'FontSize',14)
 
-save(simulation_name,'EbN0dB','ber')
+
+save(save_name,'EbN0dB','ber', 'per');
