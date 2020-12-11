@@ -23,33 +23,17 @@ for i_motdecode = 1:size(Lch_matrix, 1)
     %% Itération n°0 avec tout C2V a 0 donc ca laisse passer que les LLRs
     
     C2V = zeros(size(H));
-    V2C = H.*LLR_repetes; % Observation comme des parites --> dans les noeuds de var
+%     V2C = H.*LLR_repetes; % Observation comme des parites --> dans les noeuds de var
+    V2C = zeros(size(H));
     % [y, x] = find(H);    
     
     for n = 1:nb_iterations
-        %% Boucle remplissage C2V
         n;
         full(C2V);
         full(V2C);
         nb_iterations;
 %         for icy = cy % Ca marche pas du tout cette merde, monsieur
-        for i_c = 1:length(all_icy)
-            % i_c c'est un index pour un tableau d'index #MindBlown #JeanReviensPas
-            
-            icy = all_icy(i_c); % Notre index (i_c) marche pour all_icy, on en déduit notre index (icy) qui marche pour H
-            ivx = all_ivx(i_c);
-            % Mnt, on s'interesse sur la position H(icy, ivx)
-            
-
-            % On trouve ou sont les liens relies a ce noeud
-            connecteds2c = find(H(icy, :)); % on repere les liens mon noeud de parite --> noeuds de var
-
-            % On ne retient pas les liens sur lequel on est
-            connecteds2c(connecteds2c == ivx) = [];
-            values_connecteds2c = V2C(icy, connecteds2c);
-            
-            C2V(icy, ivx) = 2*atanh(prod(tanh(values_connecteds2c/2)));
-        end
+        
         %% Boucle remplissage V2C
         for i_v = 1:length(all_ivx)
             icy = all_icy(i_v); % i_c c'est un index pour un tableau d'index #MindBlown #JeanReviensPas
@@ -68,7 +52,25 @@ for i_motdecode = 1:size(Lch_matrix, 1)
             end
             V2C(icy, ivx) = somme;
         end
+        
+        %% Boucle remplissage C2V
+        for i_c = 1:length(all_icy)
+            % i_c c'est un index pour un tableau d'index #MindBlown #JeanReviensPas
+            
+            icy = all_icy(i_c); % Notre index (i_c) marche pour all_icy, on en déduit notre index (icy) qui marche pour H
+            ivx = all_ivx(i_c);
+            % Mnt, on s'interesse sur la position H(icy, ivx)
+            
 
+            % On trouve ou sont les liens relies a ce noeud
+            connecteds2c = find(H(icy, :)); % on repere les liens mon noeud de parite --> noeuds de var
+
+            % On ne retient pas les liens sur lequel on est
+            connecteds2c(connecteds2c == ivx) = [];
+            values_connecteds2c = V2C(icy, connecteds2c);
+            
+            C2V(icy, ivx) = 2*atanh(prod(tanh(values_connecteds2c/2)));
+        end
     end
 %     LLRs = sum(V2C, 1); % Je somme sur les colonnes
     LLRs = sum(C2V, 1); % Je somme sur les colonnes

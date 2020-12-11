@@ -147,9 +147,10 @@ for i_snr = 1:length(EbN0dB)
         Lch      = step(demod_psk,y);   % D�modulation (retourne des LLRs)
 
 %         H = alist2sparse('alist/DEBUG_6_3.alist');
-        y = decoder(Lch, H, nb_iterations);
+%         y = decoder(Lch, H, nb_iterations);
+        rec_b = BeliefProp_JULIEN(H, Lch)';
 
-        rec_b = double(y(1:K) < 0); % D�cision
+%         rec_b = double(y(1:K) < 0); % D�cision
         T_rx    = T_rx + toc(rx_tic);  % Mesure du d�bit de d�codage
 
         err_stat   = step(stat_erreur, b, rec_b); % Comptage des erreurs binaires et des taux
