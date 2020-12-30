@@ -44,7 +44,7 @@ for i=1:length(tab)
 end
 
 %% Setup graph
-set(gcf,'color','white')
+
 xlim([bornes_SNR(1) bornes_SNR(2)])
 ylim([1e-6 2])
 grid on

@@ -1,14 +1,22 @@
 clear all
 clc
 
+%% En fait ca marchera jamais mon decodeur, il faut necessairement que je fasse 2 fichiers, un avec un ité adaptatif et l'autre non
+
+
+
 % FAIRE make DANS LA CONSOLE POUR CREER LA FONCTION LDPC_H2G
 
 %% Constantes USER
 
+ENCODE_DECODE_ON = 1;
 RANDOM_ON = 1;
 NOISE_ON = 1;
+SAVE_IN_FILE_ON = 1;
 CHOIX_DU_CODE = 2; % entre 1 et 3
-nb_iterations = 1;
+ADAPTATIVE_ITE_NUMBER_ON = 0;
+nb_iterations = 10;
+MIN_SUM_ON = 1;
 
 UNDERSTAND_MATRICES_H_AND_G = 1;
 
@@ -19,28 +27,70 @@ EbN0dB_max  = 10; % Maximum de EbN0
 EbN0dB_step = 1;% Pas de EbN0
 
 nbr_err_min  = 50; % Nombre d'erreurs a observer avant de calculer un BER
-nbr_err_min_mauvais_snr = 200; % Nombre d'erreurs a observer sur un mauvais snr (dï¿½fini en dessous)
-seuil_nbr_bits_requis = 6e4; % Si on ne dï¿½passe pas ce nombre de bits, on doit au moins avoir 200 erreurs
+nbr_err_min_mauvais_snr = 300; % Nombre d'erreurs a observer sur un mauvais snr (dï¿½fini en dessous)
+seuil_nbr_bits_requis = 1e5; % Si on ne dï¿½passe pas ce nombre de bits, on doit au moins avoir 200 erreurs
 nbr_bit_max = 1e7; % Nombre de bits max a simuler
 ber_min     = 1e-6; % BER min
 
-%% Parametres calculÃ©s ou figÃ©s par le TP
+%% Parametres calcules ou figes pour le TP
 % -------------------------------------------------------------------------
 addpath('src');
 codes_path = ["DEBUG_6_3", "CCSDS_64_128", "MACKAY_504_1008"];
-save_name = strcat(codes_path(CHOIX_DU_CODE),"_nb_ite_",int2str(nb_iterations));
+
+
+
+if(MIN_SUM_ON)
+    save_name = strcat(codes_path(CHOIX_DU_CODE), "_MIN_SUM_nb_ite_", int2str(nb_iterations));
+else
+    save_name = strcat(codes_path(CHOIX_DU_CODE), "_nb_ite_", int2str(nb_iterations));
+end
+
 construct_full_path = strcat('alist/', codes_path(CHOIX_DU_CODE), '.alist')
 H = alist2sparse(construct_full_path); % on lit H dans un json-like version matlab
 [h, g] = ldpc_h2g(H); % donne h et g systematiques (necessite le compilateur C de matlab add-on MinGW)
-[height, w] = size(H);
+[height, width] = size(h);
+
 
 if(UNDERSTAND_MATRICES_H_AND_G)
+    %% Si je comprends bien et selon le code qui marche (etonnemment) de ce projet
+    figure();
+
+    % Ca c'est la matrice de parite, construite avec precaution et tout
+    % bien designe par les chercheurs (on devine une procedure iterative pour la construire)
+    subplot(3, 2, 1);
+    spy(H); title('H'); 
     
+    % Sauf qu'elle correspond pas (ou pas toujours) a une matrice génératrice systematique
+    % Du coup on va devoir en faire un peu de la bouillie avec des permutations de 
+    % colonnes pour qu'elle corresponde a une G systematique
+    subplot(3, 2, 2);
+    spy(h); title('h'); 
+    
+    % Par ailleurs on a notre G systematique
+    truc = subplot(3, 2, [3, 4]);
+    spy(g); title('g'); 
+    
+    % On voit bien que g*H ça marche pas bien, ca fait pas 0
+    subplot(3, 2, 5);
+    spy( mod(g*H', 2) ); title("g*H'"); 
+    
+    % En revanche g*h marche bien, ca fait bien 0 
+    subplot(3, 2, 6);
+    spy( mod(g*h', 2) ); title("g*h'"); 
+    
+    % la H donnée du code (6, 3) correspond deja a une matrice g systematique
+    % donc ca ne changera rien pour ce code
+    
+    % BONUS : En cours nous on voyait comment passer d'une G systematique a
+    % une H correspondante qui faisait apparaitre l'identite, mais ca changeait 
+    %les dimensions de la matrice. Or, ici, dans les fonctions sombres, il doit 
+    % y avoir une contrainte pour garder les memes dimensions peut-etre, 
+    % ce qui fait surement qu'on voit pas H comme une partie Identite dedans
     
 end
 
 
-R = 1-(rank(full(H))/w); % rendement de la communication
+R = 1-(rank(full(h))/width); % rendement de la communication
 
 % Pour ce TP, on prend 1_msg = 1_paquet
 pqt_par_trame = 1; % Nombre de paquets par trame
@@ -85,7 +135,10 @@ awgn_channel = comm.AWGNChannel(...
 stat_erreur = comm.ErrorRate(); % Calcul du nombre d'erreur et du BER
 
 %% Initialisation des vecteurs de resultats
+debits_Tx = zeros(1,length(EbN0dB));
+debits_Rx = zeros(1,length(EbN0dB));
 ber = zeros(1,length(EbN0dB));
+per = zeros(1,length(EbN0dB));
 err_paquet = zeros(1,length(EbN0dB));
 Pe = qfunc(sqrt(2*EbN0));
 
@@ -139,8 +192,12 @@ for i_snr = 1:length(EbN0dB)
             b    = ones(K,1);    % Gï¿½nï¿½ration du message alï¿½atoire
         end
 
-        code = encoder(g, b); % encodage LDPC
-
+        if(ENCODE_DECODE_ON)
+            code = encoder(g, b); % encodage LDPC
+        else 
+            code = b;
+        end
+            
         x      = step(mod_psk,  code); % Modulation BPSK
 
 
@@ -158,8 +215,15 @@ for i_snr = 1:length(EbN0dB)
         rx_tic = tic;                  % Mesure du dï¿½bit de dï¿½codage
         Lch      = step(demod_psk,y);   % Dï¿½modulation (retourne des LLRs)
 
-%         H = alist2sparse('alist/DEBUG_6_3.alist');
-        y = decoder(Lch, H, nb_iterations);
+        if(ENCODE_DECODE_ON)
+            if(ADAPTATIVE_ITE_NUMBER_ON)
+                [y, nb_iterations_done] = decoder_V2_adaptatif(Lch, h, MIN_SUM_ON);
+            else
+                y = decoder_V2(Lch, h, nb_iterations, MIN_SUM_ON);
+            end
+        else
+            y = Lch;
+        end
 
         rec_b = double(y(1:K) < 0); % Dï¿½cision
         T_rx    = T_rx + toc(rx_tic);  % Mesure du dï¿½bit de dï¿½codage
@@ -200,6 +264,8 @@ for i_snr = 1:length(EbN0dB)
 
     ber(i_snr) = err_stat(1);
     per(i_snr) = nb_err_paquets/(err_stat(3)/height);
+    debits_Tx(i_snr) = err_stat(3)/8/T_tx/1e3;
+    debits_Rx(i_snr) = err_stat(3)/8/T_rx/1e3;
     refreshdata(h_ber);
     drawnow limitrate
 
@@ -211,6 +277,16 @@ end
 fprintf('|------------|---------------|------------|----------|----------------|-----------------|--------------|\n')
 
 %%
+
+if(SAVE_IN_FILE_ON && ENCODE_DECODE_ON && RANDOM_ON && NOISE_ON && ~ADAPTATIVE_ITE_NUMBER_ON)
+    path = get_free_path(save_name);
+    save(path,'EbN0dB','ber', 'per', 'debits_Tx', 'debits_Rx');
+    disp(strcat('saved on : ',path));
+else
+    warning("data is not saved because one of the User Constants (ON/OFF variables) was not appropriate. Save workspace now with save('datafilename.mat')"); 
+    warning("Les données n'ont pas été sauvegardées parce qu'une des constantes utilisateurs (variables ON/OFF) semble non appropriée. Sauvegardez maintenant toutes vos variables avec save('datafilename.mat')"); 
+end
+
 figure(1)
 semilogy(EbN0dB,ber);
 hold all;
@@ -222,4 +298,3 @@ xlabel('$\frac{E_b}{N_0}$ en dB','Interpreter', 'latex', 'FontSize',14)
 ylabel('TEB','Interpreter', 'latex', 'FontSize',14)
 
 
-save(save_name,'EbN0dB','ber', 'per');

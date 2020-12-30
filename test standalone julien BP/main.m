@@ -5,12 +5,13 @@ clc
 
 %% Constantes USER
 
+ENCODE_DECODE_ON = 1;
 RANDOM_ON = 1;
 NOISE_ON = 1;
-CHOIX_DU_CODE = 2; % entre 1 et 3
+SAVE_IN_FILE_ON = 1;
+CHOIX_DU_CODE = 1; % entre 1 et 3
 nb_iterations = 1;
-
-UNDERSTAND_MATRICES_H_AND_G = 1;
+USE_JULIEN_BP = 1;
 
 %% Constantes  GRAPH
 
@@ -19,28 +20,24 @@ EbN0dB_max  = 10; % Maximum de EbN0
 EbN0dB_step = 1;% Pas de EbN0
 
 nbr_err_min  = 50; % Nombre d'erreurs a observer avant de calculer un BER
-nbr_err_min_mauvais_snr = 200; % Nombre d'erreurs a observer sur un mauvais snr (dï¿½fini en dessous)
-seuil_nbr_bits_requis = 6e4; % Si on ne dï¿½passe pas ce nombre de bits, on doit au moins avoir 200 erreurs
+nbr_err_min_mauvais_snr = 300; % Nombre d'erreurs a observer sur un mauvais snr (dï¿½fini en dessous)
+seuil_nbr_bits_requis = 1e5; % Si on ne dï¿½passe pas ce nombre de bits, on doit au moins avoir 200 erreurs
 nbr_bit_max = 1e7; % Nombre de bits max a simuler
 ber_min     = 1e-6; % BER min
 
-%% Parametres calculÃ©s ou figÃ©s par le TP
+%% Parametres calcules ou figes pour le TP
 % -------------------------------------------------------------------------
 addpath('src');
 codes_path = ["DEBUG_6_3", "CCSDS_64_128", "MACKAY_504_1008"];
-save_name = strcat(codes_path(CHOIX_DU_CODE),"_nb_ite_",int2str(nb_iterations));
+save_name = strcat(codes_path(CHOIX_DU_CODE), "_nb_ite_", int2str(nb_iterations));
 construct_full_path = strcat('alist/', codes_path(CHOIX_DU_CODE), '.alist')
 H = alist2sparse(construct_full_path); % on lit H dans un json-like version matlab
 [h, g] = ldpc_h2g(H); % donne h et g systematiques (necessite le compilateur C de matlab add-on MinGW)
-[height, w] = size(H);
+[height, width] = size(h);
 
-if(UNDERSTAND_MATRICES_H_AND_G)
-    
-    
-end
+% load('code2.mat')
 
-
-R = 1-(rank(full(H))/w); % rendement de la communication
+R = 1-(rank(full(h))/width); % rendement de la communication
 
 % Pour ce TP, on prend 1_msg = 1_paquet
 pqt_par_trame = 1; % Nombre de paquets par trame
@@ -86,6 +83,7 @@ stat_erreur = comm.ErrorRate(); % Calcul du nombre d'erreur et du BER
 
 %% Initialisation des vecteurs de resultats
 ber = zeros(1,length(EbN0dB));
+per = zeros(1,length(EbN0dB));
 err_paquet = zeros(1,length(EbN0dB));
 Pe = qfunc(sqrt(2*EbN0));
 
@@ -139,8 +137,12 @@ for i_snr = 1:length(EbN0dB)
             b    = ones(K,1);    % Gï¿½nï¿½ration du message alï¿½atoire
         end
 
-        code = encoder(g, b); % encodage LDPC
-
+        if(ENCODE_DECODE_ON)
+            code = encoder(g, b); % encodage LDPC
+        else 
+            code = b;
+        end
+            
         x      = step(mod_psk,  code); % Modulation BPSK
 
 
@@ -158,10 +160,23 @@ for i_snr = 1:length(EbN0dB)
         rx_tic = tic;                  % Mesure du dï¿½bit de dï¿½codage
         Lch      = step(demod_psk,y);   % Dï¿½modulation (retourne des LLRs)
 
-%         H = alist2sparse('alist/DEBUG_6_3.alist');
-        y = decoder(Lch, H, nb_iterations);
+        if(ENCODE_DECODE_ON)
+            if(USE_JULIEN_BP)
+                y = BeliefProp_JULIEN(h, Lch, nb_iterations);
+            else
+                y = decoder(Lch, h, nb_iterations); % CEST PAS DU JULIEN    
+            end
+        else
+            y = Lch;
+        end
 
-        rec_b = double(y(1:K) < 0); % Dï¿½cision
+        if(USE_JULIEN_BP)
+            rec_b = y';
+        else
+            rec_b = double(y(1:K) < 0); % Dï¿½cision CEST PAS DU JULIEN    
+        end
+
+
         T_rx    = T_rx + toc(rx_tic);  % Mesure du dï¿½bit de dï¿½codage
 
         err_stat   = step(stat_erreur, b, rec_b); % Comptage des erreurs binaires et des taux
@@ -211,6 +226,16 @@ end
 fprintf('|------------|---------------|------------|----------|----------------|-----------------|--------------|\n')
 
 %%
+
+if(SAVE_IN_FILE_ON && ENCODE_DECODE_ON && RANDOM_ON && NOISE_ON)
+    path = get_free_path(save_name);
+    save(path,'EbN0dB','ber', 'per');
+    disp(strcat('saved on : ',path));
+else
+    warning("data is not saved because one of the User Constants (ON/OFF variables) was not appropriate. Save workspace now with save('datafilename.mat')"); 
+    warning("Les données n'ont pas été sauvegardées parce qu'une des constantes utilisateurs (variables ON/OFF) semble non appropriée. Sauvegardez maintenant toutes vos variables avec save('datafilename.mat')"); 
+end
+
 figure(1)
 semilogy(EbN0dB,ber);
 hold all;
@@ -222,4 +247,3 @@ xlabel('$\frac{E_b}{N_0}$ en dB','Interpreter', 'latex', 'FontSize',14)
 ylabel('TEB','Interpreter', 'latex', 'FontSize',14)
 
 
-save(save_name,'EbN0dB','ber', 'per');

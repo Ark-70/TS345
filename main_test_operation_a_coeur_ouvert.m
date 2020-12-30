@@ -10,8 +10,6 @@ NOISE_ON = 1;
 CHOIX_DU_CODE = 2; % entre 1 et 3
 nb_iterations = 1;
 
-UNDERSTAND_MATRICES_H_AND_G = 1;
-
 %% Constantes  GRAPH
 
 EbN0dB_min  = 0; % Minimum de EbN0
@@ -19,8 +17,8 @@ EbN0dB_max  = 10; % Maximum de EbN0
 EbN0dB_step = 1;% Pas de EbN0
 
 nbr_err_min  = 50; % Nombre d'erreurs a observer avant de calculer un BER
-nbr_err_min_mauvais_snr = 200; % Nombre d'erreurs a observer sur un mauvais snr (dï¿½fini en dessous)
-seuil_nbr_bits_requis = 6e4; % Si on ne dï¿½passe pas ce nombre de bits, on doit au moins avoir 200 erreurs
+nbr_err_min_mauvais_snr = 200; % Nombre d'erreurs a observer sur un mauvais snr (défini en dessous)
+seuil_nbr_bits_requis = 6e4; % Si on ne dépasse pas ce nombre de bits, on doit au moins avoir 200 erreurs
 nbr_bit_max = 1e7; % Nombre de bits max a simuler
 ber_min     = 1e-6; % BER min
 
@@ -31,20 +29,16 @@ codes_path = ["DEBUG_6_3", "CCSDS_64_128", "MACKAY_504_1008"];
 save_name = strcat(codes_path(CHOIX_DU_CODE),"_nb_ite_",int2str(nb_iterations));
 construct_full_path = strcat('alist/', codes_path(CHOIX_DU_CODE), '.alist')
 H = alist2sparse(construct_full_path); % on lit H dans un json-like version matlab
-[h, g] = ldpc_h2g(H); % donne h et g systematiques (necessite le compilateur C de matlab add-on MinGW)
-[height, w] = size(H);
+[~, g] = ldpc_h2g(H); % donne h et g systematiques (necessite le compilateur C de matlab add-on MinGW)
+[h, w] = size(H);
 
-if(UNDERSTAND_MATRICES_H_AND_G)
-    
-    
-end
-
+% load('code2.mat')
 
 R = 1-(rank(full(H))/w); % rendement de la communication
 
 % Pour ce TP, on prend 1_msg = 1_paquet
 pqt_par_trame = 1; % Nombre de paquets par trame
-bit_par_msg = height;
+bit_par_msg = h;
 bit_par_pqt = bit_par_msg;% Nombre de bits par paquet
 
 K = pqt_par_trame*bit_par_pqt; % Nombre de bits de message par trame
@@ -123,10 +117,10 @@ for i_snr = 1:length(EbN0dB)
     T_rx = 0;
     T_tx = 0;
     general_tic = tic;
-
-
-%     nb_err_bits_verite_terrain = 0
-
+    
+    
+    nb_err_bits_verite_terrain = 0
+    
     while ((err_stat(3)<seuil_nbr_bits_requis || err_stat(2)<nbr_err_min) && err_stat(2) < nbr_err_min_mauvais_snr && err_stat(3) < nbr_bit_max)
         n_frame = n_frame + 1;
 
@@ -142,8 +136,8 @@ for i_snr = 1:length(EbN0dB)
         code = encoder(g, b); % encodage LDPC
 
         x      = step(mod_psk,  code); % Modulation BPSK
-
-
+        
+        
         T_tx   = T_tx+toc(tx_tic);    % Mesure du dï¿½bit d'encodage
 
         %% Canal
@@ -153,18 +147,33 @@ for i_snr = 1:length(EbN0dB)
         else
             y = x;
         end
-
+        
         %% Recepteur
         rx_tic = tic;                  % Mesure du dï¿½bit de dï¿½codage
         Lch      = step(demod_psk,y);   % Dï¿½modulation (retourne des LLRs)
 
 %         H = alist2sparse('alist/DEBUG_6_3.alist');
-        y = decoder(Lch, H, nb_iterations);
+%         y = decoder(Lch, H, nb_iterations);
+        rec_b = BeliefProp_JULIEN(H, Lch)';
 
-        rec_b = double(y(1:K) < 0); % Dï¿½cision
+%         rec_b = double(y(1:K) < 0); % Dï¿½cision
         T_rx    = T_rx + toc(rx_tic);  % Mesure du dï¿½bit de dï¿½codage
 
+        
+%         nb_err_stat_avant = err_stat(2) % nb erreur bits 
+        
         err_stat   = step(stat_erreur, b, rec_b); % Comptage des erreurs binaires et des taux
+        
+%         b(1:5)
+%         rec_b(1:5)
+%         
+%         nb_err_bits_verite_terrain = nb_err_bits_verite_terrain + sum(b~=rec_b)
+%         length(b)
+%         taux_err_bits_verite_terrain = nb_err_bits_verite_terrain/64
+%         nb_err_stat_apres = err_stat(2) % nb erreur bits 
+%         
+%         taux_err_stat = err_stat(1)
+%         nbbits_err_stat = err_stat(3)
 
         nb_err_paquets = nb_err_paquets + any(rec_b~=b); % Comptage des erreurs paquets//motdecode
         taux_err_paquets = nb_err_paquets /n_frame;
@@ -199,7 +208,7 @@ for i_snr = 1:length(EbN0dB)
     reverseStr = repmat(sprintf('\b'), 1, msg_sz);
 
     ber(i_snr) = err_stat(1);
-    per(i_snr) = nb_err_paquets/(err_stat(3)/height);
+    per(i_snr) = nb_err_paquets/(err_stat(3)/h);
     refreshdata(h_ber);
     drawnow limitrate
 
